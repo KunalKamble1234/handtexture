@@ -4,4 +4,3 @@ numpy
 mediapipe
 pycaw
 comtypes
-pywin32
