@@ -2,16 +2,13 @@ import streamlit as st
 import cv2
 import numpy as np
 import math
-import platform
-from ctypes import cast, POINTER
+from ctypes import cast, POINTER, windll
 from comtypes import CLSCTX_ALL
 from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
 import mediapipe as mp
 
-# Initialize COM (only on Windows)
-if platform.system() == "Windows":
-    from ctypes import windll
-    windll.ole32.CoInitialize(None)
+# Initialize COM
+windll.ole32.CoInitialize(None)
 
 # Hand Tracking Module
 class handDetector:
