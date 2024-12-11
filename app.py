@@ -2,13 +2,10 @@ import streamlit as st
 import cv2
 import numpy as np
 import math
-from ctypes import cast, POINTER, windll
+import platform
+from ctypes import cast, POINTER
 from comtypes import CLSCTX_ALL
-from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
 import mediapipe as mp
-
-# Initialize COM
-windll.ole32.CoInitialize(None)
 
 # Hand Tracking Module
 class handDetector:
@@ -80,14 +77,18 @@ st.sidebar.markdown("Use hand gestures to control volume.")
 detector = handDetector(detectionCon=0.7, maxHands=1)
 
 # Audio Utilities (Wrapped in Try-Except for Non-Windows Platforms)
-try:
-    devices = AudioUtilities.GetSpeakers()
-    interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-    volume = cast(interface, POINTER(IAudioEndpointVolume))
-    volRange = volume.GetVolumeRange()
-    minVol, maxVol = volRange[0], volRange[1]
-except Exception as e:
-    st.error(f"Audio control is not supported on this platform: {e}")
+if platform.system() == "Windows":
+    try:
+        from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
+        devices = AudioUtilities.GetSpeakers()
+        interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+        volume = cast(interface, POINTER(IAudioEndpointVolume))
+        volRange = volume.GetVolumeRange()
+        minVol, maxVol = volRange[0], volRange[1]
+    except Exception as e:
+        st.error(f"Audio control is not supported on this platform: {e}")
+        volume = None
+else:
     volume = None
 
 # Main App
