@@ -6,8 +6,6 @@ from ctypes import cast, POINTER
 from comtypes import CLSCTX_ALL
 from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
 import mediapipe as mp
-import random
-import time
 
 # Hand Tracking Module
 class handDetector:
@@ -55,19 +53,6 @@ class handDetector:
                               (bbox[2] + 20, bbox[3] + 20), (0, 255, 0), 2)
         return self.lmList, bbox
 
-    def fingersUp(self):
-        fingers = []
-        if self.lmList[self.tipIds[0]][1] > self.lmList[self.tipIds[0] - 1][1]:
-            fingers.append(1)
-        else:
-            fingers.append(0)
-        for id in range(1, 5):
-            if self.lmList[self.tipIds[id]][2] < self.lmList[self.tipIds[id] - 2][2]:
-                fingers.append(1)
-            else:
-                fingers.append(0)
-        return fingers
-
     def findDistance(self, p1, p2, img, draw=True):
         x1, y1 = self.lmList[p1][1], self.lmList[p1][2]
         x2, y2 = self.lmList[p2][1], self.lmList[p2][2]
@@ -85,31 +70,34 @@ st.title("Hand Gesture Volume Control")
 
 # Sidebar
 st.sidebar.title("Controls")
-run = st.sidebar.checkbox("Run Webcam")
+st.session_state["run"] = st.sidebar.checkbox("Run Webcam", key="run_webcam")
 st.sidebar.markdown("Use hand gestures to control volume.")
 
 # Hand Detector
 detector = handDetector(detectionCon=0.7, maxHands=1)
 
-# Audio Utilities
-devices = AudioUtilities.GetSpeakers()
-interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-volume = cast(interface, POINTER(IAudioEndpointVolume))
-volRange = volume.GetVolumeRange()
-minVol, maxVol = volRange[0], volRange[1]
+# Audio Utilities (Wrapped in Try-Except for Non-Windows Platforms)
+try:
+    devices = AudioUtilities.GetSpeakers()
+    interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+    volume = cast(interface, POINTER(IAudioEndpointVolume))
+    volRange = volume.GetVolumeRange()
+    minVol, maxVol = volRange[0], volRange[1]
+except Exception as e:
+    st.error(f"Audio control is not supported on this platform: {e}")
+    volume = None
 
 # Main App
-if run:
+if st.session_state["run"]:
     cap = cv2.VideoCapture(0)
     cap.set(3, 640)
     cap.set(4, 480)
     volBar = 400
     volPer = 0
 
-    stop = False  # Flag to control the loop
-    stframe = st.empty()  # Create an empty container for the webcam frame
+    stframe = st.empty()
 
-    while not stop:
+    while st.session_state["run"]:
         success, img = cap.read()
         if not success:
             st.warning("Webcam not detected.")
@@ -118,7 +106,7 @@ if run:
         img = detector.findHands(img)
         lmList, bbox = detector.findPosition(img, draw=True)
 
-        if len(lmList) != 0:
+        if len(lmList) != 0 and volume is not None:
             length, img, _ = detector.findDistance(4, 8, img)
             volBar = np.interp(length, [50, 200], [400, 150])
             volPer = np.interp(length, [50, 200], [0, 100])
@@ -128,11 +116,7 @@ if run:
         cv2.rectangle(img, (50, int(volBar)), (85, 400), (255, 0, 0), cv2.FILLED)
         cv2.putText(img, f'{int(volPer)}%', (40, 450), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 0, 0), 3)
 
-        # Update the webcam feed in the same space
         stframe.image(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), channels="RGB", use_container_width=True)
-
-        # Generate a unique key using time and random
-        stop = st.sidebar.button("Stop", key=f"stop_button_{int(time.time())}_{random.randint(0, 100000)}")
 
     cap.release()
 else:
